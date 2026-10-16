@@ -31,6 +31,24 @@ static class Installer
 
     public static string Version => typeof(Installer).Assembly.GetName().Version?.ToString(3) ?? "?";
 
+    /// The "Start with Windows" entry, pointing at whichever copy turns it on.
+    public static bool StartupEnabled
+    {
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
+            return key?.GetValue(Default.RegistryName) is string;
+        }
+        set
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(RunKeyPath);
+            if (value)
+                key.SetValue(Default.RegistryName, $"\"{Environment.ProcessPath}\"");
+            else
+                key.DeleteValue(Default.RegistryName, throwOnMissingValue: false);
+        }
+    }
+
     public static bool IsRunningFrom(Target target) =>
         string.Equals(Path.GetDirectoryName(Environment.ProcessPath), target.Folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
 

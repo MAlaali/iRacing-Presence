@@ -20,7 +20,7 @@ sealed record ServiceStatus(
 sealed record RunOptions(bool Demo, bool DryRun, string MemMapName, string? DiscordPipe, bool Welcome = false);
 
 /// Polls iRacing, builds the presence and keeps Discord in sync with it.
-sealed class PresenceService(SettingsStore settings, NameBook names, ImageCatalog images, RunOptions options)
+sealed class PresenceService(SettingsStore settings, NameBook names, SharedNames sharedNames, ImageCatalog images, RunOptions options)
 {
     // Discord accepts 5 activity updates per 20 seconds.
     static readonly TimeSpan MinSendGap = TimeSpan.FromSeconds(4);
@@ -33,6 +33,7 @@ sealed class PresenceService(SettingsStore settings, NameBook names, ImageCatalo
     readonly bool demo = options.Demo, dryRun = options.DryRun;
 
     readonly HashSet<string> _announced = new(StringComparer.OrdinalIgnoreCase);
+    readonly ResultsReporter _results = new();
     volatile bool _paused;
 
     public event Action<ServiceStatus>? StatusChanged;
@@ -112,12 +113,17 @@ sealed class PresenceService(SettingsStore settings, NameBook names, ImageCatalo
             bool iRacingOpen = sim != null || IsRunning(cfg.IRacingProcesses);
 
             if (sim != null && PresenceBuilder.UsesPictures(cfg))
-                sim = sim with { CarImage = images.Car(sim.Car), TrackImage = images.Track(sim.TrackFull) };
+            {
+                // While watching someone else, show their car.
+                var car = sim.WatchingCar.Length > 0 ? sim.WatchingCar : sim.Car;
+                sim = sim with { CarImage = images.Car(car), TrackImage = images.Track(sim.TrackFull) };
+            }
 
             string? seriesName = null;
             if (sim != null)
             {
-                seriesName = sim.KnownSeriesName ?? (sim.NameKey is { } key ? names.Get(key) : null);
+                seriesName = sim.KnownSeriesName
+                    ?? (sim.NameKey is { } key ? names.Get(key) ?? (cfg.SharedNames ? sharedNames.Get(key) : null) : null);
                 if (seriesName == null && sim.NameKey is { } unnamed)
                 {
                     names.Remember(unnamed);
@@ -231,6 +237,8 @@ sealed class PresenceService(SettingsStore settings, NameBook names, ImageCatalo
                     lastSend = DateTime.UtcNow;
                 }
             }
+
+            _results.Observe(sim, seriesName, cfg, dryRun);
 
             StatusChanged?.Invoke(new ServiceStatus(
                 IRacingOpen: iRacingOpen,

@@ -9,6 +9,10 @@
 //   weekend   official GT3 event: practice (garage, then on track) → qualifying → timed race
 //   lap-race  league race over a fixed number of laps
 //   crash     like weekend, but stops updating after 8 s without clearing the status (sim crash)
+//   finish    a race from the formation lap to the flag (seconds ~40): caution at 12-16 s, last lap
+//             at 22-28 s, checkered at 28 s, cool down at 34 s, with final results
+//   spectate  watching another driver's car in a race
+//   night-rain  team league race at night in the rain
 
 using System.IO.MemoryMappedFiles;
 using System.Text;
@@ -26,6 +30,8 @@ var seconds = args.Length > 1 ? double.Parse(args[1]) : 60;
     ("SessionLapsTotal", 2), ("SessionLapsRemainEx", 2), ("Lap", 2),
     ("PlayerCarPosition", 2), ("PlayerCarClassPosition", 2), ("PlayerCarMyIncidentCount", 2),
     ("LapBestLapTime", 4), ("IsOnTrack", 1), ("IsInGarage", 1), ("IsReplayPlaying", 1), ("OnPitRoad", 1),
+    ("SessionFlags", 3), ("CamCarIdx", 2), ("AirTemp", 4), ("TrackWetness", 2), ("Precipitation", 4),
+    ("SolarAltitude", 4), ("WeatherDeclaredWet", 1),
 ];
 
 const int HeaderSize = 112, VarHeaderSize = 144, NumBuf = 3, YamlOffset = 8192, YamlCapacity = 65536;
@@ -77,7 +83,8 @@ view.Write(4, 1); // status: connected
 Console.WriteLine($"FakeSim running scenario '{scenario}' for {seconds}s. Ctrl+C to stop.");
 
 var started = DateTime.UtcNow;
-int tick = 0, lastSession = -1;
+int tick = 0;
+string lastYaml = "";
 var buffer = new byte[bufLen];
 
 void Set(string name, double value)
@@ -103,13 +110,25 @@ while (true)
         continue;
     }
 
-    bool lapRace = scenario == "lap-race";
-    int session = lapRace ? 2 : t < 15 ? 0 : t < 30 ? 1 : 2;
-    if (session != lastSession)
+    bool lapRace = scenario is "lap-race" or "night-rain";
+    bool raceOnly = lapRace || scenario is "finish" or "spectate";
+    int session = raceOnly ? 2 : t < 15 ? 0 : t < 30 ? 1 : 2;
+
+    // irsdk_SessionState 3 parade laps, 4 racing, 5 checkered, 6 cool down; flags: caution 0x4000,
+    // white (last lap) 0x0002, checkered 0x0001
+    int state = 4, flags = 0;
+    if (scenario == "finish")
     {
-        WriteYaml(Yaml(lapRace, session));
-        lastSession = session;
-        Console.WriteLine($"  t={t:0}s session {session}");
+        state = t < 6 ? 3 : t < 28 ? 4 : t < 34 ? 5 : 6;
+        flags = t is >= 12 and < 16 ? 0x4000 : t is >= 22 and < 28 ? 0x0002 : t >= 28 ? 0x0001 : 0;
+    }
+    bool finished = state >= 5;
+    var yamlKey = $"{session}:{finished}";
+    if (yamlKey != lastYaml)
+    {
+        WriteYaml(Yaml(scenario, session, finished));
+        lastYaml = yamlKey;
+        Console.WriteLine($"  t={t:0}s session {session}{(finished ? " (results final)" : "")}");
     }
 
     double intoSession = lapRace ? 600 + t : session == 0 ? t : session == 1 ? t - 15 : t - 30;
@@ -119,7 +138,8 @@ while (true)
     Array.Clear(buffer);
     Set("SessionTime", intoSession);
     Set("SessionNum", session);
-    Set("SessionState", 4); // racing
+    Set("SessionState", state);
+    Set("SessionFlags", flags);
     Set("SessionTimeRemain", lapRace ? 604800 : sessionLength - intoSession);
     Set("SessionLapsTotal", lapRace ? 20 : 32767);
     Set("SessionLapsRemainEx", lapRace ? 13 : 32767);
@@ -128,8 +148,16 @@ while (true)
     Set("PlayerCarClassPosition", session == 0 ? 0 : 2);
     Set("PlayerCarMyIncidentCount", 2);
     Set("LapBestLapTime", session == 0 ? 0 : 137.512);
-    Set("IsOnTrack", inGarage ? 0 : 1);
+    bool spectating = scenario == "spectate";
+    bool night = scenario == "night-rain";
+    Set("IsOnTrack", inGarage || spectating ? 0 : 1);
     Set("IsInGarage", inGarage ? 1 : 0);
+    Set("CamCarIdx", spectating ? 3 : 5);
+    Set("AirTemp", night ? 13.6 : 22.4);
+    Set("TrackWetness", night ? 6 : 1);
+    Set("Precipitation", night ? 0.4 : 0);
+    Set("SolarAltitude", night ? -0.3 : 0.6);
+    Set("WeatherDeclaredWet", night ? 1 : 0);
     Set("IsReplayPlaying", 0);
     Set("OnPitRoad", 0);
 
@@ -142,8 +170,14 @@ while (true)
 view.Write(4, 0); // status: disconnected, like the sim does on exit
 Console.WriteLine("FakeSim stopped.");
 
-static string Yaml(bool lapRace, int current)
+static string Yaml(string scenario, int current, bool finished)
 {
+    bool lapRace = scenario is "lap-race" or "night-rain";
+    // Your line in the race results: final once the flag is out.
+    string playerResult = finished
+        ? "   - Position: 3\n     ClassPosition: 2\n     CarIdx: 5\n     Lap: 17\n     LapsComplete: 17\n" +
+          "     FastestLap: 9\n     FastestTime: 137.1040\n     Incidents: 2\n     ReasonOutStr: Running"
+        : "   - Position: 2\n     CarIdx: 5";
     string weekend = lapRace
         ? """
            TrackName: roadamerica full
@@ -184,6 +218,8 @@ static string Yaml(bool lapRace, int current)
            Category: Road
            NumCarClasses: 1
           """;
+    if (scenario == "night-rain")
+        weekend += "\n TeamRacing: 1";
 
     string sessions = lapRace
         ? """
@@ -201,7 +237,7 @@ static string Yaml(bool lapRace, int current)
              - CarIdx: 3
                FastestLap: 4
           """
-        : """
+        : $"""
            - SessionNum: 0
              SessionLaps: unlimited
              SessionTime: 1800.0000 sec
@@ -232,14 +268,13 @@ static string Yaml(bool lapRace, int current)
                ClassPosition: 0
                CarIdx: 3
                Lap: 0
-             - Position: 2
-               CarIdx: 5
+          {playerResult}
           """;
 
     // Driver and team names are deliberately awkward: iRacing doesn't quote or escape them.
     string drivers = $"""
          DriverInfo:
-          DriverCarIdx: 5
+          DriverCarIdx: {(scenario == "spectate" ? 7 : 5)}
           DriverUserID: 111111
           PaceCarIdx: 0
           Drivers:
@@ -266,7 +301,7 @@ static string Yaml(bool lapRace, int current)
             IsSpectator: 0
           - CarIdx: 5
             UserName: Test Driver
-            TeamName: Test Driver
+            TeamName: {(scenario == "night-rain" ? "Test Racing Team" : "Test Driver")}
             CarNumber: "42"
             CarClassID: 4083
             CarIsPaceCar: 0

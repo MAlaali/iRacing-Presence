@@ -15,9 +15,9 @@ function Publish([string]$out, [bool]$standalone) {
     $publishArgs = @("publish", $project, "-c", "Release", "-r", "win-x64", "-o", $out, "-nologo",
         "-p:PublishSingleFile=true", "-p:DebugType=none")
     if ($standalone) {
-        $publishArgs += @("--self-contained", "true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:EnableCompressionInSingleFile=true")
+        $publishArgs += @("--self-contained", "true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:EnableCompressionInSingleFile=true", "-p:Flavor=full")
     } else {
-        $publishArgs += @("--self-contained", "false")
+        $publishArgs += @("--self-contained", "false", "-p:Flavor=lite")
     }
     dotnet @publishArgs | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }

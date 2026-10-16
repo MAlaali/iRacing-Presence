@@ -1,0 +1,8 @@
+# Version manifest for winget (https://github.com/microsoft/winget-pkgs).
+# Copy this folder to manifests/m/MAlaali/iRacingPresence/<version>/ in a fork of winget-pkgs,
+# update the version, URL and SHA256 in all three files, and open a pull request.
+PackageIdentifier: MAlaali.iRacingPresence
+PackageVersion: 1.3.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

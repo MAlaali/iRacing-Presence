@@ -8,11 +8,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>iRacingPresence</AssemblyName>
     <RootNamespace>IRacingPresence</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
+    <!-- "full" or "lite" from build.ps1, so the updater fetches the same kind of setup -->
+    <Flavor Condition="'$(Flavor)' == ''">dev</Flavor>
     <Product>iRacing Discord Presence</Product>
     <AssemblyTitle>iRacing Discord Presence</AssemblyTitle>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
     <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="Flavor" Value="$(Flavor)" />
+  </ItemGroup>
 
 </Project>

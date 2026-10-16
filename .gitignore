@@ -3,4 +3,6 @@ obj/
 dist/
 # Setup files are attached to GitHub releases, not committed.
 release/*.exe
+# iRacing's own logo (taken from the iRacing app) is uploaded to Discord, not redistributed here.
+assets/icons/iracing-logo.png
 *.log

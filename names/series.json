@@ -1,0 +1,10 @@
+// Series and league names shared by everyone who uses iRacing Discord Presence.
+// iRacing only tells the app a series number, so a name added here shows up for everybody
+// (within about 12 hours) instead of each person naming it from the tray menu.
+//
+// To add one: find the ID in the app (tray menu › "Name this series… (series ID 4012)", or the
+// log), then add a line like the examples below, keeping the commas right, and commit.
+//   "series:4012": "GT Sprint",
+//   "league:1234": "Sunday Night League"
+{
+}

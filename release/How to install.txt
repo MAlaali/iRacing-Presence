@@ -4,12 +4,13 @@ iRacing Discord Presence
 Shows what you're doing in iRacing on your Discord profile:
 
     Playing iRacing
-      GT Sprint · Race · P3 of 24
+      GT Sprint · Race · Last lap · P3 of 24
       Porsche 911 GT3 R (992) @ Spa
-      12:34 left
+      01:34 left
 
-with a picture of your car and the track. It works on its own: it starts with Windows, sits
-in the notification area, and updates your status whenever you're in a session.
+with a picture of your car and the track; hover them for your iRating, license, best lap and
+the weather. It works on its own: it starts with Windows, sits in the notification area,
+updates your status whenever you're in a session, and offers new versions when they're out.
 
 
 INSTALL (one minute)
@@ -29,13 +30,18 @@ That's it. Start iRacing and join a session.
 
 GOOD TO KNOW
 ------------
+- Settings: right-click the "iR" icon > "Settings..." (or double-click the icon). You can change
+  what each line shows and see a live preview of your Discord card.
+- Race results in your Discord server: in Settings > Extras, paste a channel's webhook URL
+  (Discord: Server Settings > Integrations > Webhooks > New Webhook > Copy Webhook URL).
 - Series names: iRacing only tells the app a series number, not its name. The first time you
   race in a new series, right-click the "iR" icon > "Name this series..." and type e.g.
   "GT Sprint". It remembers it from then on.
 - Seeing two iRacing entries on your profile? The extra plain one is Discord's own game
   detection; remove iRacing under Discord Settings > Registered Games.
 - Hide your status for a while: right-click the "iR" icon > "Hide my iRacing status".
-- Update: run a newer iRacingPresence-Setup.exe the same way. Your settings are kept.
+- Updates: the app tells you when a new version is out; click the message to install it.
+  Your settings are kept.
 - Uninstall: Windows Settings > Apps > Installed apps > iRacing Discord Presence > Uninstall.
 
 

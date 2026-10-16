@@ -13,11 +13,15 @@ static partial class PresenceBuilder
 
     public static DiscordActivity Build(SimState s, string seriesName, Settings cfg, DateTimeOffset now)
     {
-        var values = Placeholders(s, seriesName);
-        var activity = NewActivity(cfg, Fill(cfg.Details, values), Fill(cfg.State, values));
+        var values = Placeholders(s, seriesName, cfg.UsesFahrenheit);
+        // Watching someone else gets its own second line ("Watching Max Verstappen @ Spa").
+        var stateTemplate = s.WatchingName.Length > 0 ? cfg.SpectateState : cfg.State;
+        var activity = NewActivity(cfg, Fill(cfg.Details, values), Fill(stateTemplate, values));
         activity.Assets = Assets(cfg, values);
 
-        if (cfg.ShowTimeLeft && s.LapsTotal == null && s.TimeRemaining is double left)
+        if (s.Moment == RaceMoment.Finished)
+            activity.Timestamps = null; // the race is over; a clock would only confuse
+        else if (cfg.ShowTimeLeft && s.LapsTotal == null && s.TimeRemaining is double left)
             activity.Timestamps = new ActivityTimestamps { End = now.AddSeconds(left).ToUnixTimeMilliseconds() };
         else if (cfg.ShowElapsedTime)
             activity.Timestamps = new ActivityTimestamps { Start = now.AddSeconds(-s.SessionElapsed).ToUnixTimeMilliseconds() };
@@ -41,13 +45,23 @@ static partial class PresenceBuilder
         return activity;
     }
 
-    public static Dictionary<string, string> Placeholders(SimState s, string seriesName)
+    public static Dictionary<string, string> Placeholders(SimState s, string seriesName, bool fahrenheit = false)
     {
         var inv = CultureInfo.InvariantCulture;
         string laps = s.LapsTotal is int total ? $"Lap {Math.Min(Math.Max(s.Lap, 1), total)}/{total}"
             : s.Lap > 0 ? $"Lap {s.Lap}" : "";
+        string bestLap = s.BestLap > 0 ? TimeSpan.FromSeconds(s.BestLap).ToString(@"m\:ss\.fff", inv) : "";
+        string irating = s.IRating is "" or "0" ? "" : s.IRating;
         return new Dictionary<string, string>
         {
+            ["moment"] = MomentText(s.Moment),
+            ["rating"] = irating.Length > 0 ? $"{irating} iR" : "",
+            ["best"] = bestLap.Length > 0 ? $"Best {bestLap}" : "",
+            ["conditions"] = Conditions(s, fahrenheit),
+            ["team"] = s.Team,
+            ["driver"] = s.DriverName,
+            ["watching"] = s.WatchingName.Length > 0 ? $"Watching {s.WatchingName}" : "",
+            ["watching_car"] = s.WatchingCar,
             ["series"] = seriesName,
             // A test drive is both the "series" and the session; say it once.
             ["session"] = s.Session.Equals(seriesName, StringComparison.OrdinalIgnoreCase) ? "" : s.Session,
@@ -80,14 +94,42 @@ static partial class PresenceBuilder
             ["lap"] = s.Lap > 0 ? s.Lap.ToString(inv) : "",
             ["laps_total"] = s.LapsTotal?.ToString(inv) ?? "",
             ["laps"] = laps,
-            // Lap races have no useful countdown, so show the lap count instead.
-            ["progress"] = s.LapsTotal != null && s.SessionKey == "race" ? laps : "",
+            // Lap races have no useful countdown, so show the lap count instead. "Last lap" and
+            // "Finished" already say where the race is.
+            ["progress"] = s.LapsTotal != null && s.IsRace && s.Moment is not (RaceMoment.LastLap or RaceMoment.Finished) ? laps : "",
             ["time_left"] = s.TimeRemaining is double left ? FormatTimeLeft(left) : "",
             ["incidents"] = $"{s.Incidents}x",
-            ["best_lap"] = s.BestLap > 0 ? TimeSpan.FromSeconds(s.BestLap).ToString(@"m\:ss\.fff", inv) : "",
-            ["irating"] = s.IRating is "" or "0" ? "" : s.IRating,
+            ["best_lap"] = bestLap,
+            ["irating"] = irating,
             ["license"] = s.License,
         };
+    }
+
+    public static string MomentText(RaceMoment moment) => moment switch
+    {
+        RaceMoment.InGarage => "In the garage",
+        RaceMoment.InPits => "In the pits",
+        RaceMoment.Grid => "On the grid",
+        RaceMoment.Formation => "Formation lap",
+        RaceMoment.Caution => "Caution",
+        RaceMoment.RedFlag => "Red flag",
+        RaceMoment.LastLap => "Last lap",
+        RaceMoment.Finished => "🏁 Finished",
+        RaceMoment.Spectating => "Spectating",
+        _ => "",
+    };
+
+    /// "Rain · Night · 14°C": only what's unusual, plus the air temperature.
+    static string Conditions(SimState s, bool fahrenheit)
+    {
+        var parts = new List<string>();
+        if (s.Raining) parts.Add("Rain");
+        else if (s.Wet) parts.Add("Wet track");
+        else if (s.Damp) parts.Add("Damp track");
+        if (s.Night) parts.Add("Night");
+        if (s.AirTempC is double c)
+            parts.Add(fahrenheit ? $"{Math.Round(c * 9 / 5 + 32):0}°F" : $"{Math.Round(c):0}°C");
+        return string.Join(" · ", parts);
     }
 
     static DiscordActivity NewActivity(Settings cfg, string? details, string? state) => new()
@@ -166,16 +208,19 @@ static partial class PresenceBuilder
 
     /// "P3 of 24" (your class position in multiclass: "P2 of 12 in GT3"), or "24 drivers" until
     /// you have a position (before a lap time in practice), or nothing when you're alone.
-    static string Standing(SimState s)
+    public static string Standing(SimState s)
     {
         var inv = CultureInfo.InvariantCulture;
-        if (s.Multiclass && s.ClassPosition > 0 && s.ClassFieldSize >= s.ClassPosition)
+        // Once the flag is out, the official results are the final word.
+        int position = s.Moment == RaceMoment.Finished && s.Result is { Position: > 0 } r ? r.Position : s.Position;
+        int classPosition = s.Moment == RaceMoment.Finished && s.Result is { ClassPosition: > 0 } rc ? rc.ClassPosition : s.ClassPosition;
+        if (s.Multiclass && classPosition > 0 && s.ClassFieldSize >= classPosition)
         {
             var cls = s.CarClass.Length > 0 ? s.CarClass : "class";
-            return $"P{s.ClassPosition.ToString(inv)} of {s.ClassFieldSize.ToString(inv)} in {cls}";
+            return $"P{classPosition.ToString(inv)} of {s.ClassFieldSize.ToString(inv)} in {cls}";
         }
-        if (s.Position > 0 && s.FieldSize >= s.Position)
-            return $"P{s.Position.ToString(inv)} of {s.FieldSize.ToString(inv)}";
+        if (position > 0 && s.FieldSize >= position)
+            return $"P{position.ToString(inv)} of {s.FieldSize.ToString(inv)}";
         return s.FieldSize >= 2 ? $"{s.FieldSize.ToString(inv)} drivers" : "";
     }
 

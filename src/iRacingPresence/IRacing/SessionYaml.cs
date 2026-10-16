@@ -136,6 +136,9 @@ static class YamlNodeExtensions
     public static int Int(this Dictionary<string, object>? map, string key, int fallback = 0) =>
         int.TryParse(map.Str(key), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : fallback;
 
+    public static double Double(this Dictionary<string, object>? map, string key, double fallback = 0) =>
+        double.TryParse(map.Str(key), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : fallback;
+
     public static Dictionary<string, object>? Map(this Dictionary<string, object>? map, string key) =>
         map != null && map.TryGetValue(key, out var v) ? v as Dictionary<string, object> : null;
 
