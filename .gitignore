@@ -1,0 +1,6 @@
+bin/
+obj/
+dist/
+# Setup files are attached to GitHub releases, not committed.
+release/*.exe
+*.log

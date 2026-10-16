@@ -1,0 +1,50 @@
+iRacing Discord Presence 1.1.0
+==============================
+
+Shows what you're doing in iRacing on your Discord profile:
+
+    Playing iRacing
+      GT Sprint · Race
+      Porsche 911 GT3 R (992) @ Spa  (3 of 24)
+      12:34 left
+
+with a picture of your car and the track. It works on its own: it starts with Windows, sits
+in the notification area, and updates your status whenever you're in a session.
+
+
+INSTALL (one minute)
+--------------------
+1. Double-click  iRacingPresence-Setup.exe  and click Yes.
+
+   Windows may show "Windows protected your PC", because this is a small hobby app that
+   isn't signed. Click "More info", then "Run anyway".
+
+2. A message says it's running. Look for the "iR" icon near the clock (it may be hidden
+   behind the ^ arrow).
+
+3. In Discord, check that Settings > Activity Privacy > "Share my activity" is on.
+
+That's it. Start iRacing and join a session.
+
+
+GOOD TO KNOW
+------------
+- Series names: iRacing only tells the app a series number, not its name. The first time you
+  race in a new series, right-click the "iR" icon > "Name this series..." and type e.g.
+  "GT Sprint". It remembers it from then on.
+- Seeing two iRacing entries on your profile? The extra plain one is Discord's own game
+  detection; remove iRacing under Discord Settings > Registered Games.
+- Hide your status for a while: right-click the "iR" icon > "Hide my iRacing status".
+- Update: run a newer iRacingPresence-Setup.exe the same way. Your settings are kept.
+- Uninstall: Windows Settings > Apps > Installed apps > iRacing Discord Presence > Uninstall.
+
+
+WHICH FILE?
+-----------
+iRacingPresence-Setup.exe       ~48 MB   Works on any 64-bit Windows 10/11 PC. Use this one.
+iRacingPresence-Setup-lite.exe  ~0.3 MB  Same app, small enough to send in a Discord chat, but it
+                                          needs Microsoft's free ".NET 9 Desktop Runtime". If it's
+                                          missing, Windows offers to download it on first launch.
+
+
+Not affiliated with iRacing or Discord. Car and track pictures come from iracing.com.
