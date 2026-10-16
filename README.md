@@ -8,8 +8,8 @@ A small Windows tray app that shows what you're doing in iRacing on your Discord
 
 ```
 Playing iRacing
-  GT Sprint · Race
-  Porsche 911 GT3 R (992) @ Spa  (3 of 24)
+  GT Sprint · Race · P3 of 24
+  Porsche 911 GT3 R (992) @ Spa
   12:34 left
 ```
 
@@ -20,7 +20,7 @@ Playing iRacing
 | Session (Practice / Qualifying / Race / Warmup / Heat…) | iRacing SDK, current session |
 | Time left | Live countdown from `SessionTimeRemain`. Lap races show `Lap 7/20` instead |
 | Car | Your car's `CarScreenName` |
-| Position | `(3 of 24)`, your class position in multiclass races |
+| Position | `P3 of 24` (`P2 of 12 in GT3` in multiclass), or `24 drivers` before you have a position |
 | Pictures | Official picture of your car (big) and track (round badge), matched by name from iracing.com's public car and track lists; cached a week in `image-cache.json` |
 
 It reads iRacing's official telemetry shared memory, the same source every overlay uses. It doesn't touch the sim itself and needs no login.
@@ -72,12 +72,12 @@ Icon colours: grey = waiting for iRacing, green = showing on Discord, blue = hid
 Everything lives in `settings.json` next to the exe; it's commented. The text lines are templates:
 
 ```jsonc
-"details": "{series} · {session} · {progress}",
+"details": "{series} · {session} · {progress} · {standing}",
 "state":   "{car} @ {track}",
 ```
 
 Placeholders: `{series} {session} {track} {track_full} {track_config} {track_country} {car} {car_short}
-{car_class} {car_number} {status} {position} {class_position} {field_size} {class_field_size} {lap}
+{car_class} {car_number} {status} {standing} {players} {position} {class_position} {field_size} {class_field_size} {lap}
 {laps_total} {laps} {progress} {time_left} {incidents} {best_lap} {irating} {license}`.
 Empty placeholders are removed along with their ` · ` / ` @ ` separators.
 

@@ -70,5 +70,10 @@ for ($i = 0; $i -lt $sizes.Count; $i++) {
 }
 foreach ($f in $frames) { $w.Write($f) }
 $w.Flush()
-[System.IO.File]::WriteAllBytes((Resolve-Path (Split-Path $out)).Path + "\app.ico", $ico.ToArray())
+$assets = (Resolve-Path (Split-Path $out)).Path
+[System.IO.File]::WriteAllBytes("$assets\app.ico", $ico.ToArray())
 "saved $out ($($ico.Length) bytes)"
+
+# The same badge at 1024 px, for the Discord application's App Icon.
+[System.IO.File]::WriteAllBytes("$assets\app-icon-1024.png", (New-Frame 1024))
+"saved $assets\app-icon-1024.png"

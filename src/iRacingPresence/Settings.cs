@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace IRacingPresence;
 
@@ -13,7 +14,7 @@ sealed class Settings
     public string ActivityType { get; set; } = "playing";
     public string MemberListShows { get; set; } = "name";
 
-    public string Details { get; set; } = "{series} · {session} · {progress}";
+    public string Details { get; set; } = "{series} · {session} · {progress} · {standing}";
     public string State { get; set; } = "{car} @ {track}";
     public string LargeImage { get; set; } = "{car_image}|iracing";
     public string LargeImageText { get; set; } = "{car}";
@@ -22,7 +23,7 @@ sealed class Settings
 
     public bool ShowTimeLeft { get; set; } = true;
     public bool ShowElapsedTime { get; set; } = true;
-    public bool ShowPosition { get; set; } = true;
+    public bool ShowPosition { get; set; } = false;
 
     public IdleSettings Idle { get; set; } = new();
     public List<ButtonSettings> Buttons { get; set; } = [];
@@ -45,7 +46,7 @@ sealed class ButtonSettings
 }
 
 /// Loads settings.json and reloads it whenever the file changes, so edits apply without a restart.
-sealed class SettingsStore(string path)
+sealed partial class SettingsStore(string path)
 {
     static readonly JsonSerializerOptions ReadOptions = new()
     {
@@ -76,8 +77,17 @@ sealed class SettingsStore(string path)
                 var stamp = File.GetLastWriteTimeUtc(Path);
                 if (stamp != _stamp)
                 {
+                    var text = File.ReadAllText(Path);
+                    var upgraded = UpgradeOldDefaults(text);
+                    if (upgraded != text)
+                    {
+                        File.WriteAllText(Path, upgraded);
+                        text = upgraded;
+                        stamp = File.GetLastWriteTimeUtc(Path);
+                        Log.Info("Updated settings.json to the new defaults (the top line now shows your position, or the number of drivers).");
+                    }
                     _stamp = stamp;
-                    _current = JsonSerializer.Deserialize<Settings>(File.ReadAllText(Path), ReadOptions) ?? new Settings();
+                    _current = JsonSerializer.Deserialize<Settings>(text, ReadOptions) ?? new Settings();
                     if (string.IsNullOrWhiteSpace(_current.DiscordApplicationId))
                         _current.DiscordApplicationId = Settings.DefaultApplicationId;
                     LoadError = null;
@@ -93,6 +103,25 @@ sealed class SettingsStore(string path)
             return _current;
         }
     }
+
+    /// Settings files written by older versions keep their old defaults; swap those for the
+    /// current ones. Only exact old default values are touched, never customised ones.
+    static string UpgradeOldDefaults(string text)
+    {
+        // 1.2.0: position (or the driver count) on the top line
+        const string details = "\"details\": \"{series} · {session} · {progress} · {standing}\"";
+        text = text
+            .Replace("\"details\": \"{series} · {session} · {progress}\"", details)               // from 1.1.0
+            .Replace("\"details\": \"{series} · {session} · {progress} · {players}\"", details);  // from 1.1.1
+        // ...so Discord's own "(3 of 24)" would repeat it.
+        return OldShowPositionDefault().Replace(text,
+            "$1// Discord's own \"(3 of 24)\" after the second line. Off because the top line already$2\n" +
+            "$1// shows your position ({standing}).$2\n" +
+            "$3\"showPosition\": false");
+    }
+
+    [GeneratedRegex("""^([ \t]*)// Position as "\(3 of 24\)"\. Uses your class position in multiclass races\.(\r?)\n([ \t]*)"showPosition": true""", RegexOptions.Multiline)]
+    private static partial Regex OldShowPositionDefault();
 
     const string DefaultFile = """
         {
@@ -112,10 +141,11 @@ sealed class SettingsStore(string path)
           // Text lines. Placeholders:
           //   {series} {session} {track} {track_full} {track_config} {track_country}
           //   {car} {car_short} {car_class} {car_number} {status}
+          //   {standing} ("P3 of 24", or "24 drivers" before you have a position) {players} ("24 drivers")
           //   {position} {class_position} {field_size} {class_field_size}
           //   {lap} {laps_total} {laps} {progress} {time_left} {incidents} {best_lap} {irating} {license}
           // Empty placeholders and their " · " / " @ " / " | " separators are removed automatically.
-          "details": "{series} · {session} · {progress}",
+          "details": "{series} · {session} · {progress} · {standing}",
           "state": "{car} @ {track}",
 
           // Pictures. {car_image} and {track_image} are the official pictures of your current car and
@@ -133,8 +163,9 @@ sealed class SettingsStore(string path)
           "showTimeLeft": true,
           // Elapsed timer when the session has no time limit (lap races, open practice).
           "showElapsedTime": true,
-          // Position as "(3 of 24)". Uses your class position in multiclass races.
-          "showPosition": true,
+          // Discord's own "(3 of 24)" after the second line. Off because the top line already
+          // shows your position ({standing}).
+          "showPosition": false,
 
           // Shown while the iRacing UI is open but you're not in a session.
           "idle": {

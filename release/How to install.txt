@@ -1,11 +1,11 @@
-iRacing Discord Presence 1.1.0
-==============================
+iRacing Discord Presence
+========================
 
 Shows what you're doing in iRacing on your Discord profile:
 
     Playing iRacing
-      GT Sprint · Race
-      Porsche 911 GT3 R (992) @ Spa  (3 of 24)
+      GT Sprint · Race · P3 of 24
+      Porsche 911 GT3 R (992) @ Spa
       12:34 left
 
 with a picture of your car and the track. It works on its own: it starts with Windows, sits

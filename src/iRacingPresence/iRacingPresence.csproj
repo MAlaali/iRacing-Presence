@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>iRacingPresence</AssemblyName>
     <RootNamespace>IRacingPresence</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>iRacing Discord Presence</Product>
     <AssemblyTitle>iRacing Discord Presence</AssemblyTitle>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>

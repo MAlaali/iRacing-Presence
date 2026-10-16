@@ -31,7 +31,8 @@ static partial class PresenceBuilder
 
     public static DiscordActivity BuildIdle(Settings cfg, DateTimeOffset idleSince)
     {
-        var values = new Dictionary<string, string>();
+        // No session, so every placeholder is empty (rather than left showing as "{car}").
+        var values = Placeholders(new SimState(), "").ToDictionary(p => p.Key, _ => "");
         var activity = NewActivity(cfg, Fill(cfg.Idle.Details, values), Fill(cfg.Idle.State, values));
         activity.Type = 0;
         activity.Assets = Assets(cfg, values);
@@ -72,6 +73,9 @@ static partial class PresenceBuilder
             ["position"] = s.Position > 0 ? s.Position.ToString(inv) : "",
             ["class_position"] = s.ClassPosition > 0 ? s.ClassPosition.ToString(inv) : "",
             ["field_size"] = s.FieldSize > 0 ? s.FieldSize.ToString(inv) : "",
+            // Everyone in the session (all classes). Left out when you're alone, e.g. a test drive.
+            ["players"] = s.FieldSize >= 2 ? $"{s.FieldSize.ToString(inv)} drivers" : "",
+            ["standing"] = Standing(s),
             ["class_field_size"] = s.ClassFieldSize > 0 ? s.ClassFieldSize.ToString(inv) : "",
             ["lap"] = s.Lap > 0 ? s.Lap.ToString(inv) : "",
             ["laps_total"] = s.LapsTotal?.ToString(inv) ?? "",
@@ -158,6 +162,21 @@ static partial class PresenceBuilder
         if (text.Length < 2)
             return null;
         return Truncate(text, MaxText);
+    }
+
+    /// "P3 of 24" (your class position in multiclass: "P2 of 12 in GT3"), or "24 drivers" until
+    /// you have a position (before a lap time in practice), or nothing when you're alone.
+    static string Standing(SimState s)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        if (s.Multiclass && s.ClassPosition > 0 && s.ClassFieldSize >= s.ClassPosition)
+        {
+            var cls = s.CarClass.Length > 0 ? s.CarClass : "class";
+            return $"P{s.ClassPosition.ToString(inv)} of {s.ClassFieldSize.ToString(inv)} in {cls}";
+        }
+        if (s.Position > 0 && s.FieldSize >= s.Position)
+            return $"P{s.Position.ToString(inv)} of {s.FieldSize.ToString(inv)}";
+        return s.FieldSize >= 2 ? $"{s.FieldSize.ToString(inv)} drivers" : "";
     }
 
     static string FormatTimeLeft(double seconds) =>
